@@ -83,20 +83,25 @@ class NSynthDataset(object):
     """
     example = self.get_example(batch_size)
     wav = example["audio"]
+    print("@get_wavenet_batch, wav_1:", wav) #shape=(64000,)
     wav = tf.slice(wav, [0], [64000])
+    print("@get_wavenet_batch, wav_2:", wav) #shape=(64000,)
     pitch = tf.squeeze(example["pitch"])
     key = tf.squeeze(example["note_str"])
 
     if self.is_training:
       # random crop
       crop = tf.random_crop(wav, [length])
+      print("@get_wavenet_batch, crop_1:", crop) #shape=(6144,)
       crop = tf.reshape(crop, [1, length])
+      print("@get_wavenet_batch, crop_2:", crop) #shape=(1,6144)
       key, crop, pitch = tf.train.shuffle_batch(
           [key, crop, pitch],
           batch_size,
           num_threads=4,
           capacity=500 * batch_size,
           min_after_dequeue=200 * batch_size)
+      print("@get_wavenet_batch, crop_3:", crop) #shape=(1, 1, 6144)
     else:
       # fixed center crop
       offset = (64000 - length) // 2  # 24320
@@ -109,7 +114,9 @@ class NSynthDataset(object):
           capacity=500 * batch_size,
           min_after_dequeue=200 * batch_size)
 
+    print("@get_wavenet_batch, crop_4:", crop) #shape=(1, 1, 6144)
     crop = tf.reshape(tf.cast(crop, tf.float32), [batch_size, length])
+    print("@get_wavenet_batch, crop_5:", crop) #shape=(1,6144)
     pitch = tf.cast(pitch, tf.int32)
     return {"pitch": pitch, "wav": crop, "key": key}
 

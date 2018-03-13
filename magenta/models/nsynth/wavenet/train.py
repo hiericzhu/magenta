@@ -24,6 +24,7 @@ set to 1. For training in 200k iterations, they both should be 32.
 # internal imports
 import tensorflow as tf
 
+import os
 from magenta.models.nsynth import utils
 
 slim = tf.contrib.slim
@@ -42,9 +43,12 @@ tf.app.flags.DEFINE_integer("ps_tasks", 0,
 tf.app.flags.DEFINE_integer("total_batch_size", 1,
                             "Batch size spread across all sync replicas."
                             "We use a size of 32.")
-tf.app.flags.DEFINE_string("logdir", "/tmp/nsynth",
+log_dir = os.path.join(os.environ["MAGENTA_ROOT"], "magentaData", "logdir_orig")
+tf.app.flags.DEFINE_string("logdir", log_dir,
                            "The log directory for this experiment.")
-tf.app.flags.DEFINE_string("train_path", "", "The path to the train tfrecord.")
+tfFile = "nsynth-test.tfrecord"
+train_data = os.path.join(os.environ["MAGENTA_ROOT"], "magentaData", tfFile)
+tf.app.flags.DEFINE_string("train_path", train_data, "The path to the train tfrecord.")
 tf.app.flags.DEFINE_string("log", "INFO",
                            "The threshold for what messages will be logged."
                            "DEBUG, INFO, WARN, ERROR, or FATAL.")
@@ -66,6 +70,7 @@ def main(unused_argv=None):
     total_batch_size = FLAGS.total_batch_size
     assert total_batch_size % FLAGS.worker_replicas == 0
     worker_batch_size = total_batch_size / FLAGS.worker_replicas
+    worker_batch_size = 1
 
     # Run the Reader on the CPU
     cpu_device = "/job:localhost/replica:0/task:0/cpu:0"
@@ -83,54 +88,61 @@ def main(unused_argv=None):
           tf.int32,
           initializer=tf.constant_initializer(0),
           trainable=False)
+      print("global_step:", global_step)
 
       # pylint: disable=cell-var-from-loop
       lr = tf.constant(config.learning_rate_schedule[0])
-      for key, value in config.learning_rate_schedule.iteritems():
+      for key, value in config.learning_rate_schedule.items():
         lr = tf.cond(
             tf.less(global_step, key), lambda: lr, lambda: tf.constant(value))
       # pylint: enable=cell-var-from-loop
       tf.summary.scalar("learning_rate", lr)
 
       # build the model graph
+      print("@train, ##config.build.....")
       outputs_dict = config.build(inputs_dict, is_training=True)
+      print("@train, ##config.build.....Done")
       loss = outputs_dict["loss"]
       tf.summary.scalar("train_loss", loss)
 
       worker_replicas = FLAGS.worker_replicas
       ema = tf.train.ExponentialMovingAverage(
           decay=0.9999, num_updates=global_step)
+      print("@train, ##creaet ema.....Done")
       opt = tf.train.SyncReplicasOptimizer(
           tf.train.AdamOptimizer(lr, epsilon=1e-8),
           worker_replicas,
           total_num_replicas=worker_replicas,
           variable_averages=ema,
           variables_to_average=tf.trainable_variables())
-
+      print("@train, ##creaet opt.....Done")
+      
       train_op = opt.minimize(
           loss,
           global_step=global_step,
           name="train",
           colocate_gradients_with_ops=True)
+      print("@train, ##creaet train_opt.....Done")
 
       session_config = tf.ConfigProto(allow_soft_placement=True)
 
       is_chief = (FLAGS.task == 0)
       local_init_op = opt.chief_init_op if is_chief else opt.local_step_init_op
 
+      print("@train, ##slim.learning.train.....start")
       slim.learning.train(
           train_op=train_op,
           logdir=logdir,
           is_chief=is_chief,
           master=FLAGS.master,
-          number_of_steps=config.num_iters,
+          number_of_steps=5, #config.num_iters,
           global_step=global_step,
           log_every_n_steps=250,
           local_init_op=local_init_op,
-          save_interval_secs=300,
+          save_interval_secs=60*20,
           sync_optimizer=opt,
           session_config=session_config,)
-
+      print("@train, ##slim.learning.train.....Done")
 
 if __name__ == "__main__":
   tf.app.run()
