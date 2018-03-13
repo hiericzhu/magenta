@@ -47,6 +47,7 @@ log_dir = os.path.join(os.environ["MAGENTA_ROOT"], "magentaData", "logdir_orig")
 tf.app.flags.DEFINE_string("logdir", log_dir,
                            "The log directory for this experiment.")
 tfFile = "nsynth-test.tfrecord"
+tfFile = "mywav.tfrecord"
 train_data = os.path.join(os.environ["MAGENTA_ROOT"], "magentaData", tfFile)
 tf.app.flags.DEFINE_string("train_path", train_data, "The path to the train tfrecord.")
 tf.app.flags.DEFINE_string("log", "INFO",

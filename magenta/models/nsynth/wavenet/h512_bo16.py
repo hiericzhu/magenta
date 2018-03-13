@@ -142,6 +142,7 @@ class Config(object):
 
   def __init__(self, train_path=None):
     self.num_iters = 200000
+    #learning rate is bigger at begining, then smaller
     self.learning_rate_schedule = {
         0: 2e-4,
         90000: 4e-4 / 3,
@@ -284,7 +285,7 @@ class Config(object):
     print("\t output[en] is: ",en) #shape=(1, 12, 16) #6144/512=12
     print("\t create ae_pool Done\n")
     
-    encoding = en
+    encoding = en #encoding is 'feature vector', (125,16) for every 4 seconds voice. 125=4x16000/512
     print("\t ##Non-Causal Temporal Encoder output[en|encoding] is: ",encoding)
     print("@build, ##Non-Causal Temporal Encoder...Done\n")
     
