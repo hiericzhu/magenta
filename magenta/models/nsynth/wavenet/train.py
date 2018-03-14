@@ -52,7 +52,8 @@ tf.app.flags.DEFINE_integer("wav_piece_length", wav_piece_length,
                             "Wav length in *.tfrecord file."
                             "We use a size of 6144, 8000, 16000 or 64000.")
 
-tfFile = "mywav_%d.tfrecord" % wav_piece_length 
+#tfFile = "mywav_%d.tfrecord" % wav_piece_length
+tfFile = ['mywav_8000_1.tfrecord', 'mywav_8000_2.tfrecord'] 
 train_data = os.path.join(os.environ["MAGENTA_ROOT"], "magentaData", tfFile)
 tf.app.flags.DEFINE_string("train_path", train_data, "The path to the train tfrecord.")
 tf.app.flags.DEFINE_string("log", "INFO",
