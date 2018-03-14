@@ -43,17 +43,21 @@ tf.app.flags.DEFINE_integer("ps_tasks", 0,
 tf.app.flags.DEFINE_integer("total_batch_size", 1,
                             "Batch size spread across all sync replicas."
                             "We use a size of 32.")
-log_dir = os.path.join(os.environ["MAGENTA_ROOT"], "magentaData", "logdir_orig")
+log_dir = os.path.join(os.environ["MAGENTA_ROOT"], "magentaData", "logdir_dev")
 tf.app.flags.DEFINE_string("logdir", log_dir,
                            "The log directory for this experiment.")
-tfFile = "nsynth-test.tfrecord"
-tfFile = "mywav.tfrecord"
+
+wav_piece_length = 8000
+tf.app.flags.DEFINE_integer("wav_piece_length", wav_piece_length,
+                            "Wav length in *.tfrecord file."
+                            "We use a size of 6144, 8000, 16000 or 64000.")
+
+tfFile = "mywav_%d.tfrecord" % wav_piece_length 
 train_data = os.path.join(os.environ["MAGENTA_ROOT"], "magentaData", tfFile)
 tf.app.flags.DEFINE_string("train_path", train_data, "The path to the train tfrecord.")
 tf.app.flags.DEFINE_string("log", "INFO",
                            "The threshold for what messages will be logged."
                            "DEBUG, INFO, WARN, ERROR, or FATAL.")
-
 
 def main(unused_argv=None):
   tf.logging.set_verbosity(FLAGS.log)
@@ -79,7 +83,7 @@ def main(unused_argv=None):
       cpu_device = "/job:worker/cpu:0"
 
     with tf.device(cpu_device):
-      inputs_dict = config.get_batch(worker_batch_size)
+      inputs_dict = config.get_batch(worker_batch_size,wav_piece_length=wav_piece_length)
 
     with tf.device(
         tf.train.replica_device_setter(ps_tasks=FLAGS.ps_tasks,
