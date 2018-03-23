@@ -223,11 +223,16 @@ class MyDataset(object):
     Returns:
       tf.Example protobuf parsed from tfrecord.
     """
+    
     reader = tf.TFRecordReader()
     num_epochs = None if self.is_training else 1
     capacity = batch_size
+    #input only one tfrecord file
     path_queue = tf.train.input_producer(
         [self.record_path],
+    #input can be *.tfrecord in a folder, NOK yet
+    #path_queue = tf.train.string_input_producer(
+    #    tf.train.match_filenames_once(self.record_path),
         num_epochs=num_epochs,
         shuffle=self.is_training,
         capacity=capacity)

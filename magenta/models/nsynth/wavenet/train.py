@@ -25,7 +25,13 @@ set to 1. For training in 200k iterations, they both should be 32.
 import tensorflow as tf
 
 import os
+import sys
+magenta_orig_path = 'D:\\myPrjs\\magenta_dev'
+sys.path.append(magenta_orig_path)
 from magenta.models.nsynth import utils
+
+#force use CPU only
+#os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
 
 slim = tf.contrib.slim
 FLAGS = tf.app.flags.FLAGS
@@ -44,6 +50,7 @@ tf.app.flags.DEFINE_integer("total_batch_size", 1,
                             "Batch size spread across all sync replicas."
                             "We use a size of 32.")
 log_dir = os.path.join(os.environ["MAGENTA_ROOT"], "magentaData", "logdir_dev")
+#log_dir = os.path.join(os.environ["MAGENTA_ROOT"], "magentaData", "logdir_dev2")
 tf.app.flags.DEFINE_string("logdir", log_dir,
                            "The log directory for this experiment.")
 
@@ -52,10 +59,18 @@ tf.app.flags.DEFINE_integer("wav_piece_length", wav_piece_length,
                             "Wav length in *.tfrecord file."
                             "We use a size of 6144, 8000, 16000 or 64000.")
 
+
 #tfFile = "mywav_%d.tfrecord" % wav_piece_length
-tfFile = ['mywav_8000_1.tfrecord', 'mywav_8000_2.tfrecord'] 
+tfFile = "mgmm_wav_8000.tfrecord" 
 train_data = os.path.join(os.environ["MAGENTA_ROOT"], "magentaData", tfFile)
 tf.app.flags.DEFINE_string("train_path", train_data, "The path to the train tfrecord.")
+
+'''
+#mult tfrecord file 
+train_path = os.path.join(os.environ["MAGENTA_ROOT"], "magentaData", 'mgmm', '*.tfrecord')
+tf.app.flags.DEFINE_string("train_path", train_path, "The path to the train tfrecord.")
+'''
+
 tf.app.flags.DEFINE_string("log", "INFO",
                            "The threshold for what messages will be logged."
                            "DEBUG, INFO, WARN, ERROR, or FATAL.")
@@ -122,30 +137,34 @@ def main(unused_argv=None):
           variable_averages=ema,
           variables_to_average=tf.trainable_variables())
       print("@train, ##creaet opt.....Done")
-      
-      train_op = opt.minimize(
+
+      #the original's loss is global_step        
+      train_op = slim.learning.create_train_op(
           loss,
+          opt,
           global_step=global_step,
-          name="train",
           colocate_gradients_with_ops=True)
+       
       print("@train, ##creaet train_opt.....Done")
 
       session_config = tf.ConfigProto(allow_soft_placement=True)
 
       is_chief = (FLAGS.task == 0)
       local_init_op = opt.chief_init_op if is_chief else opt.local_step_init_op
+      #####init_op = (tf.global_variables_initializer(), tf.local_variables_initializer()) #NOK
 
       print("@train, ##slim.learning.train.....start")
       slim.learning.train(
+          #####init_op=init_op, #NOK
           train_op=train_op,
           logdir=logdir,
           is_chief=is_chief,
           master=FLAGS.master,
-          number_of_steps=5, #config.num_iters,
+          number_of_steps=200000, #, #config.num_iters,
           global_step=global_step,
           log_every_n_steps=250,
           local_init_op=local_init_op,
-          save_interval_secs=60*20,
+          save_interval_secs=60*20, #save module every x seconds
           sync_optimizer=opt,
           session_config=session_config,)
       print("@train, ##slim.learning.train.....Done")
