@@ -160,7 +160,7 @@ class Config(object):
 
   def get_batch(self, batch_size,wav_piece_length):
     assert self.train_path is not None
-    data_train = reader.MyDataset(self.train_path, is_training=True, wav_piece_length=wav_piece_length)
+    data_train = reader.MyDatasetMultInput(self.train_path, is_training=True, wav_piece_length=wav_piece_length)
     return data_train.get_wavenet_batch(batch_size, length=6144)
 
   @staticmethod

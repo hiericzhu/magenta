@@ -38,7 +38,7 @@ FLAGS = tf.app.flags.FLAGS
 
 tf.app.flags.DEFINE_string("master", "",
                            "BNS name of the TensorFlow master to use.")
-tf.app.flags.DEFINE_string("config", "h512_bo16", "Model configuration name")
+tf.app.flags.DEFINE_string("config", "h512_bo16_mult_input", "Model configuration name")
 tf.app.flags.DEFINE_integer("task", 0,
                             "Task id of the replica running the training.")
 tf.app.flags.DEFINE_integer("worker_replicas", 1,
@@ -55,13 +55,10 @@ tf.app.flags.DEFINE_integer("wav_piece_length", wav_piece_length,
                             "Wav length in *.tfrecord file."
                             "We use a size of 6144, 8000, 16000 or 64000.")
 
-#single input tfrecord file
-log_dir = os.path.join(os.environ["MAGENTA_ROOT"], "magentaData", "logdir_dev")
-#tfFile = "mywav_%d.tfrecord" % wav_piece_length
-tfFile = "mgmm_wav_8000.tfrecord" # 
-train_data = os.path.join(os.environ["MAGENTA_ROOT"], "magentaData", tfFile)
-tf.app.flags.DEFINE_string("train_path", train_data, "The path to the train tfrecord.")
-
+#mult tfrecord file
+log_dir = os.path.join(os.environ["MAGENTA_ROOT"], "magentaData", "logdir_dev_kkFamily")
+train_path = os.path.join(os.environ["MAGENTA_ROOT"], "magentaData", 'kkFamily', '*.tfrecord')
+tf.app.flags.DEFINE_string("train_path", train_path, "The path to the train tfrecord.")
 tf.app.flags.DEFINE_string("log", "INFO",
                            "The threshold for what messages will be logged."
                            "DEBUG, INFO, WARN, ERROR, or FATAL.")
@@ -143,7 +140,8 @@ def main(unused_argv=None):
       session_config = tf.ConfigProto(allow_soft_placement=True)
 
       is_chief = (FLAGS.task == 0)
-      local_init_op = opt.chief_init_op if is_chief else opt.local_step_init_op
+      #local_init_op = opt.chief_init_op if is_chief else opt.local_step_init_op
+      local_init_op = tf.local_variables_initializer() #OK #suport multinput OK, but don't know the impact?
 
       print("@train, ##slim.learning.train.....start")
       slim.learning.train(
@@ -151,10 +149,10 @@ def main(unused_argv=None):
           logdir=logdir,
           is_chief=is_chief,
           master=FLAGS.master,
-          number_of_steps=400000, #, #config.num_iters,
+          number_of_steps=200000, #, #config.num_iters,
           global_step=global_step,
           log_every_n_steps=5, #250
-          local_init_op=local_init_op,
+          local_init_op=local_init_op,  
           save_interval_secs=60*20, #save module every x seconds
           sync_optimizer=opt,
           session_config=session_config,)

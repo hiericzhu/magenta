@@ -230,9 +230,90 @@ class MyDataset(object):
     #input only one tfrecord file
     path_queue = tf.train.input_producer(
         [self.record_path],
-    #input can be *.tfrecord in a folder, NOK yet
-    #path_queue = tf.train.string_input_producer(
-    #    tf.train.match_filenames_once(self.record_path),
+        num_epochs=num_epochs,
+        shuffle=self.is_training,
+        capacity=capacity)
+    unused_key, serialized_example = reader.read(path_queue)
+    features = {
+        "filename": tf.FixedLenFeature([], dtype=tf.string),
+        "audio": tf.FixedLenFeature([self.wav_piece_length], dtype=tf.float32),
+    }
+    example = tf.parse_single_example(serialized_example, features)
+    return example
+
+  def get_wavenet_batch(self, batch_size, length=6144):
+    """Get the Tensor expressions from the reader.
+
+    Args:
+      batch_size: The integer batch size.
+      length: Number of timesteps of a cropped sample to produce.
+
+    Returns:
+      A dict of key:tensor pairs. This includes "pitch", "wav", and "key".
+    """
+    example = self.get_example(batch_size)
+    wav = example["audio"]
+    print("@get_wavenet_batch, wav_1:", wav) #shape=(x,)
+    wav = tf.slice(wav, [0], [self.wav_piece_length])
+    print("@get_wavenet_batch, wav_2:", wav) #shape=(x,)
+    filename = tf.squeeze(example["filename"])
+
+    if self.is_training:
+      # random crop
+      crop = tf.random_crop(wav, [length]) #随机截取一段
+      print("@get_wavenet_batch, crop_1:", crop) #shape=(6144,)
+      crop = tf.reshape(crop, [1, length])
+      print("@get_wavenet_batch, crop_2:", crop) #shape=(1,6144)
+      filename, crop = tf.train.shuffle_batch(
+          [filename, crop],
+          batch_size,
+          num_threads=4,
+          capacity=500 * batch_size,
+          min_after_dequeue=200 * batch_size)
+      print("@get_wavenet_batch, crop_3:", crop) #shape=(1, 1, 6144)
+    else:
+      # fixed center crop
+      offset = (64000 - length) // 2  # 24320
+      crop = tf.slice(wav, [offset], [length])
+      crop = tf.reshape(crop, [1, length])
+      filename, crop = tf.train.shuffle_batch(
+          [filename, crop],
+          batch_size,
+          num_threads=4,
+          capacity=500 * batch_size,
+          min_after_dequeue=200 * batch_size)
+
+    print("@get_wavenet_batch, crop_4:", crop) #shape=(1, 1, 6144)
+    crop = tf.reshape(tf.cast(crop, tf.float32), [batch_size, length])
+    print("@get_wavenet_batch, crop_5:", crop) #shape=(1,6144)
+    return {"wav": crop, "filename": filename}
+  
+class MyDatasetMultInput(object):
+  """Dataset object to help manage the TFRecord loading."""
+
+  def __init__(self, tfrecord_path, is_training=True, wav_piece_length=64000):
+    self.is_training = is_training
+    self.record_path = tfrecord_path
+    #wave_piece_length in *.tfrecord file
+    self.wav_piece_length = wav_piece_length
+
+  def get_example(self, batch_size):
+    """Get a single example from the tfrecord file.
+
+    Args:
+      batch_size: Int, minibatch size.
+
+    Returns:
+      tf.Example protobuf parsed from tfrecord.
+    """
+    
+    reader = tf.TFRecordReader()
+    num_epochs = None if self.is_training else 1
+    capacity = batch_size
+
+    #input can be *.tfrecord in a folder
+    path_queue = tf.train.string_input_producer(
+        tf.train.match_filenames_once(self.record_path),
         num_epochs=num_epochs,
         shuffle=self.is_training,
         capacity=capacity)
